@@ -14,7 +14,8 @@
      limitations under the License.
 -->
 <resources>
-    <style name="DialtactsTheme" parent="@style/DialtactsTheme1">
+    <style name="DialtactsTheme"
+           parent="@style/DialtactsTheme1">
         <item name="activated_background">@drawable/list_item_activated_background</item>
         <item name="section_header_background">@drawable/list_title_holo</item>
         <item name="list_section_header_height">32dip</item>
