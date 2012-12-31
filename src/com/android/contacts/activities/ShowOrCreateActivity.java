@@ -203,7 +203,7 @@ public final class ShowOrCreateActivity extends ContactsActivity
     @Override
     protected Dialog onCreateDialog(int id) {
         switch(id) {
-	    case CREATE_CONTACT_DIALOG:
+            case CREATE_CONTACT_DIALOG:
                 // Prompt user to insert or edit contact
                 final Intent createIntent = new Intent(Intent.ACTION_INSERT_OR_EDIT);
                 createIntent.putExtras(mCreateExtras);
@@ -212,7 +212,7 @@ public final class ShowOrCreateActivity extends ContactsActivity
                 final CharSequence message = getResources().getString(
                         R.string.add_contact_dlg_message_fmt, mCreateDescrip);
 
-                return new AlertDialog.Builder(this, AlertDialog.THEME_HOLO_LIGHT)
+                return new AlertDialog.Builder(this, AlertDialog.THEME_HOLO_DARK)
                         .setMessage(message)
                         .setPositiveButton(android.R.string.ok,
                                 new IntentClickListener(this, createIntent))
@@ -225,7 +225,7 @@ public final class ShowOrCreateActivity extends ContactsActivity
                                 }})
                         .create();
         }
-	return super.onCreateDialog(id);
+        return super.onCreateDialog(id);
     }
 
     /**
