@@ -1967,4 +1967,8 @@ connection to the voicemail server is lost. [CHAR LIMIT=64] -->
         <item quantity="other">%d calls</item>
     </plurals>
 
+    <!-- Blacklist functions -->
+    <string name="menu_add_to_blacklist">Add to blacklist</string>
+    <string name="toast_added_to_blacklist">%s added to blacklist.</string>
+
 </resources>
