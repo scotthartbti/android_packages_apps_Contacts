@@ -16,8 +16,9 @@
 
 package com.android.contacts.dialpad;
 
-import java.util.ArrayList;
-
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -26,8 +27,6 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -36,7 +35,6 @@ import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemProperties;
@@ -54,18 +52,10 @@ import android.text.Editable;
 import android.text.SpannableString;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.text.method.DialerKeyListener;
 import android.text.style.RelativeSizeSpan;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.KeyEvent;
-import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
-import android.view.View;
-import android.view.ViewConfiguration;
-import android.view.ViewGroup;
+import android.view.*;
 import android.view.animation.Animation;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.TranslateAnimation;
@@ -73,13 +63,9 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.LinearLayout.LayoutParams;
 import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
-import android.widget.ToggleButton;
-import android.widget.ViewSwitcher;
 
 import com.android.contacts.ContactPhotoManager;
 import com.android.contacts.ContactsUtils;
@@ -145,6 +131,7 @@ public class DialpadFragment extends Fragment
 
     private View mDialButtonContainer;
     private View mDialButton;
+    private View mShowDialerButton;
     private ListView mDialpadChooser;
     private DialpadChooserAdapter mDialpadChooserAdapter;
 
@@ -156,13 +143,9 @@ public class DialpadFragment extends Fragment
         }
     };
 
-    private ToggleButton mT9Toggle;
     private ListView mT9List;
-    private ListView mT9ListTop;
     private T9Adapter mT9Adapter;
-    private T9Adapter mT9AdapterTop;
-    private ViewSwitcher mT9Flipper;
-    private LinearLayout mT9Top;
+    private boolean mT9Hidden = false;
 
     /**
      * Regular expression prohibiting manual phone call. Can be empty, which means "no rule".
@@ -318,18 +301,17 @@ public class DialpadFragment extends Fragment
         mT9List = (ListView) fragmentView.findViewById(R.id.t9list);
         if (mT9List != null) {
             mT9List.setOnItemClickListener(this);
+            mT9List.setOnTouchListener(new View.OnTouchListener() {
+                @Override
+                public boolean onTouch(View view, MotionEvent motionEvent) {
+                    if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
+                        if (!mT9Hidden)
+                            animateT9(true);
+                    }
+                    return false;
+                }
+            });
         }
-        mT9ListTop = (ListView) fragmentView.findViewById(R.id.t9listtop);
-        if (mT9ListTop != null) {
-            mT9ListTop.setOnItemClickListener(this);
-            mT9ListTop.setTag(new ContactItem());
-        }
-        mT9Toggle = (ToggleButton) fragmentView.findViewById(R.id.t9toggle);
-        if (mT9Toggle != null) {
-            mT9Toggle.setOnClickListener(this);
-        }
-        mT9Flipper = (ViewSwitcher) fragmentView.findViewById(R.id.t9flipper);
-        mT9Top = (LinearLayout) fragmentView.findViewById(R.id.t9topbar);
 
         PhoneNumberFormatter.setPhoneNumberFormattingTextWatcher(getActivity(), mDigits);
         // Check for the presence of the keypad
@@ -351,12 +333,16 @@ public class DialpadFragment extends Fragment
                     fakeMenuItemWidth, mDialButtonContainer.getPaddingBottom());
         }
         mDialButton = fragmentView.findViewById(R.id.dialButton);
+        mShowDialerButton = fragmentView.findViewById(R.id.dialerButton);
         if (r.getBoolean(R.bool.config_show_onscreen_dial_button)) {
             mDialButton.setOnClickListener(this);
             mDialButton.setOnLongClickListener(this);
+            mShowDialerButton.setOnClickListener(this);
         } else {
             mDialButton.setVisibility(View.GONE); // It's VISIBLE by default
             mDialButton = null;
+            mShowDialerButton.setVisibility(View.GONE); // It's VISIBLE by default
+            mShowDialerButton = null;
         }
 
         mDelete = fragmentView.findViewById(R.id.deleteButton);
@@ -372,6 +358,7 @@ public class DialpadFragment extends Fragment
             mDigits.setInputType(android.text.InputType.TYPE_CLASS_PHONE);
         } else {
             mDigits.setCursorVisible(false);
+            ((DialpadLayout)mDialpad).setParent(this);
         }
 
         // Set up the "dialpad chooser" UI; see showDialpadChooser().
@@ -547,7 +534,7 @@ public class DialpadFragment extends Fragment
 
         final StopWatch stopWatch = StopWatch.start("Dialpad.onResume");
 
-        hideT9();
+        //hideT9();
 
         // Query the last dialed number. Do it first because hitting
         // the DB is 'slow'. This call is asynchronous.
@@ -776,43 +763,6 @@ public class DialpadFragment extends Fragment
     }
 
     /**
-     * Hides the topresult layout
-     * Needed to reclaim the space when T9 is off.
-     */
-    private void hideT9 () {
-        if (mDigitsContainer == null) {
-            if (!isT9On()) {
-                toggleT9();
-                mT9Top.setVisibility(View.GONE);
-            }else{
-                mT9Top.setVisibility(View.VISIBLE);
-            }
-        } else {
-            LinearLayout.LayoutParams digitsLayout = (LayoutParams) mDigitsContainer.getLayoutParams();
-            if (!isT9On()) {
-                toggleT9();
-                digitsLayout.weight = 0.2f;
-                mT9Top.setVisibility(View.GONE);
-            } else {
-                digitsLayout.weight = 0.1f;
-                mT9Top.setVisibility(View.VISIBLE);
-            }
-            mDigitsContainer.setLayoutParams(digitsLayout);
-        }
-        return;
-    }
-
-    /**
-     * Toggles between expanded list and dialpad
-     */
-    private void toggleT9() {
-        if (mT9Flipper.getCurrentView() == mT9List) {
-            mT9Toggle.setChecked(false);
-            animateT9();
-        }
-    }
-
-    /**
      * Initiates a search for the dialed digits
      * Toggles view visibility based on results
      */
@@ -823,13 +773,8 @@ public class DialpadFragment extends Fragment
 
         final int length = mDigits.length();
         if (length > 0) {
+            mT9List.setVisibility(View.VISIBLE);
             T9SearchResult result = mT9Search.search(mDigits.getText().toString());
-            if (mT9AdapterTop == null) {
-                mT9AdapterTop = mT9Search.createT9Adapter(getActivity(), new ArrayList<ContactItem>());
-                mT9AdapterTop.setNotifyOnChange(true);
-            } else {
-                mT9AdapterTop.clear();
-            }
 
             if (result != null) {
                 if (mT9Adapter == null) {
@@ -842,30 +787,12 @@ public class DialpadFragment extends Fragment
                 if (mT9List.getAdapter() == null) {
                     mT9List.setAdapter(mT9Adapter);
                 }
-                mT9AdapterTop.add(result.getTopContact());
-                if (result.getNumResults() > 1) {
-                    mT9Toggle.setVisibility(View.VISIBLE);
-                } else {
-                    mT9Toggle.setVisibility(View.GONE);
-                    toggleT9();
-                }
-                mT9Toggle.setTag(null);
             } else {
-                ContactItem contact = (ContactItem) mT9ListTop.getTag();
-                contact.number = mDigits.getText().toString();
-                mT9AdapterTop.add(contact);
-                mT9Toggle.setTag(new Boolean(true));
-                mT9Toggle.setVisibility(View.GONE);
-                toggleT9();
-            }
-            mT9ListTop.setVisibility(View.VISIBLE);
-            if (mT9ListTop.getAdapter() == null) {
-                mT9ListTop.setAdapter(mT9AdapterTop);
             }
         } else {
-            mT9ListTop.setVisibility(View.INVISIBLE);
-            mT9Toggle.setVisibility(View.INVISIBLE);
-            toggleT9();
+            mT9List.setVisibility(View.INVISIBLE);
+            if (mT9Hidden)
+                animateT9(false);
         }
     }
 
@@ -887,35 +814,82 @@ public class DialpadFragment extends Fragment
     /**
      * Animates the dialpad/listview
      */
-    private void animateT9() {
-        TranslateAnimation slidedown1 = new TranslateAnimation(
+    public void animateT9(boolean hide) {
+        TranslateAnimation slidedown = new TranslateAnimation(
                 Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 0.0f,
                 Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 1.0f);
-        TranslateAnimation slidedown2 = new TranslateAnimation(
-                Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 0.0f,
-                Animation.RELATIVE_TO_PARENT, -1.0f, Animation.RELATIVE_TO_PARENT, 0.0f);
-        TranslateAnimation slideup1 = new TranslateAnimation(
-                Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 0.0f,
-                Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, -1.0f);
-        TranslateAnimation slideup2 = new TranslateAnimation(
+        TranslateAnimation slideup = new TranslateAnimation(
                 Animation.RELATIVE_TO_PARENT, 0.0f, Animation.RELATIVE_TO_PARENT, 0.0f,
                 Animation.RELATIVE_TO_PARENT, 1.0f, Animation.RELATIVE_TO_PARENT, 0.0f);
-        slidedown2.setDuration(500);
-        slidedown2.setInterpolator(new DecelerateInterpolator());
-        slidedown1.setDuration(500);
-        slidedown1.setInterpolator(new DecelerateInterpolator());
-        slideup1.setDuration(500);
-        slideup1.setInterpolator(new DecelerateInterpolator());
-        slideup2.setDuration(500);
-        slideup2.setInterpolator(new DecelerateInterpolator());
-        if (mT9Toggle.isChecked()) {
-            mT9Flipper.setOutAnimation(slidedown1);
-            mT9Flipper.setInAnimation(slidedown2);
+        slidedown.setDuration(500);
+        slidedown.setInterpolator(new DecelerateInterpolator());
+        slidedown.setFillAfter(true);
+        slideup.setDuration(500);
+        slideup.setInterpolator(new DecelerateInterpolator());
+        slideup.setFillAfter(true);
+        slidedown.setAnimationListener(mAnimListener);
+        slideup.setAnimationListener(mAnimListener);
+        if (hide) {
+            if (mDialButton != null) {
+                start(setVisibilityWhenDone(
+                        ObjectAnimator.ofFloat(mDialButton, View.ALPHA, 0f)
+                        .setDuration(500), mDialButton, View.GONE));
+                start(ObjectAnimator.ofFloat(mShowDialerButton, View.ALPHA, 1f)
+                        .setDuration(500));
+                mShowDialerButton.setVisibility(View.VISIBLE);
+            }
+            mDialpad.startAnimation(slidedown);
         } else {
-            mT9Flipper.setOutAnimation(slideup1);
-            mT9Flipper.setInAnimation(slideup2);
+            if (mDialButton != null) {
+                start(setVisibilityWhenDone(
+                        ObjectAnimator.ofFloat(mShowDialerButton, View.ALPHA, 0f)
+                                .setDuration(500), mShowDialerButton, View.GONE));
+                start(ObjectAnimator.ofFloat(mDialButton, View.ALPHA, 1f)
+                        .setDuration(500));
+                mDialButton.setVisibility(View.VISIBLE);
+            }
+            mDialpad.startAnimation(slideup);
         }
-        mT9Flipper.showNext();
+    }
+
+    private Animation.AnimationListener mAnimListener = new Animation.AnimationListener() {
+        @Override
+        public void onAnimationStart(Animation animation) {
+        }
+
+        @Override
+        public void onAnimationEnd(Animation animation) {
+            animation.cancel();
+            mDialpad.clearAnimation();
+            if (mT9Hidden) {
+                mT9Hidden = false;
+                mDialpad.setVisibility(View.VISIBLE);
+            } else {
+                mT9Hidden = true;
+                mDialpad.setVisibility(View.INVISIBLE);
+            }
+        }
+
+        @Override
+        public void onAnimationRepeat(Animation animation) {
+        }
+    };
+
+    private Animator start(Animator a) {
+        a.start();
+        return a;
+    }
+
+    private Animator setVisibilityWhenDone(
+            final Animator a, final View v, final int vis) {
+        a.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                v.setVisibility(vis);
+                a.removeAllListeners(); // oneshot
+            }
+        });
+        return a;
     }
 
     private void keyPressed(int keyCode) {
@@ -1077,18 +1051,22 @@ public class DialpadFragment extends Fragment
                 return;
             }
             case R.id.dialButton: {
-                mHaptic.vibrate();  // Vibrate here too, just like we do for the regular keys
-                dialButtonPressed();
+                if (!mT9Hidden) {
+                    mHaptic.vibrate();  // Vibrate here too, just like we do for the regular keys
+                    dialButtonPressed();
+                }
+                return;
+            }
+            case R.id.dialerButton: {
+                if (mT9Hidden) {
+                    animateT9(false);
+                }
                 return;
             }
             case R.id.digits: {
                 if (!isDigitsEmpty()) {
                     mDigits.setCursorVisible(true);
                 }
-                return;
-            }
-            case R.id.t9toggle: {
-                animateT9();
                 return;
             }
             default: {
@@ -1177,7 +1155,7 @@ public class DialpadFragment extends Fragment
                 return false;
             }
             case R.id.dialButton: {
-                if (isDigitsEmpty()) {
+                if (!mT9Hidden && isDigitsEmpty()) {
                     handleDialButtonClickWithEmptyDigits();
                     // This event should be consumed so that onClick() won't do the exactly same
                     // thing.
@@ -1453,13 +1431,10 @@ public class DialpadFragment extends Fragment
             mDialpadChooser.setAdapter(mDialpadChooserAdapter);
         } else {
             if (isT9On()) {
-                if (mT9Flipper.getCurrentView() != mT9List) {
-                    mT9Toggle.setChecked(false);
                     searchContacts();
                 } else {
                     return;
                 }
-            }
             // Log.i(TAG, "Displaying normal Dialer UI.");
             if (mDigitsContainer != null) {
                 mDigitsContainer.setVisibility(View.VISIBLE);
@@ -1583,17 +1558,8 @@ public class DialpadFragment extends Fragment
      */
     @Override
     public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
-        if (parent == mT9List || parent == mT9ListTop) {
-            if (parent == mT9List) {
-                setFormattedDigits(mT9Adapter.getItem(position).number,null);
-            } else {
-                if (mT9Toggle.getTag() == null) {
-                    setFormattedDigits(mT9AdapterTop.getItem(position).number,null);
-                } else {
-                    startActivity(getAddToContactIntent(mDigits.getText()));
-                    return;
-                }
-            }
+        if (parent == mT9List) {
+            setFormattedDigits(mT9Adapter.getItem(position).number,null);
             if (dialOnTap()) {
                 dialButtonPressed();
             }

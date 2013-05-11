@@ -6,8 +6,8 @@
 
     <QuickContactBadge
         android:id="@+id/rowBadge"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
         android:layout_marginLeft="5dp"
         android:layout_marginRight="5dp"
         android:focusable="false" />
@@ -23,14 +23,16 @@
             android:layout_weight="0.5"
             android:gravity="center_vertical"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:textSize="20sp" />
 
         <TextView
             android:id="@+id/rowNumber"
             android:layout_weight="0.5"
             android:gravity="center_vertical"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:textSize="20sp" />
 
     </LinearLayout>
 

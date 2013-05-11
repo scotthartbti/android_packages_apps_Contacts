@@ -138,7 +138,7 @@
             android:layout_marginBottom="@dimen/call_detail_button_spacing"
             android:layout_below="@id/voicemail_container"
             android:gravity="center_vertical"
-            android:background="@drawable/dialpad_background"
+            android:background="@drawable/dialpad_layout_background"
         >
             <LinearLayout
                 android:id="@+id/call_and_sms_main_action"

@@ -15,5 +15,5 @@
 -->
 
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:src="@drawable/dial_background_texture"
+    android:src="@drawable/dial_layout_background_texture"
     android:tileMode="repeat" />

@@ -156,7 +156,7 @@
                 android:layout_below="@id/main_action_push_layer"
                 android:layout_marginBottom="@dimen/call_detail_button_spacing"
                 android:layout_marginTop="@dimen/call_detail_button_spacing"
-                android:background="@drawable/dialpad_background"
+                android:background="@drawable/dialpad_layout_background"
                 android:gravity="center_vertical" >
 
                 <LinearLayout
