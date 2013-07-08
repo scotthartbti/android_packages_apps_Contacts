@@ -1559,6 +1559,17 @@ public class DialpadFragment extends Fragment
     @Override
     public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
         if (parent == mT9List) {
+            // if we are not hidden it's probably because the hide animation
+            // is currently running so wait for that to finish before showing
+            if (mT9Hidden)
+                animateT9(false);
+            else
+                mDialButton.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        animateT9(false);
+                    }
+                }, 500);
             setFormattedDigits(mT9Adapter.getItem(position).number,null);
             if (dialOnTap()) {
                 dialButtonPressed();
