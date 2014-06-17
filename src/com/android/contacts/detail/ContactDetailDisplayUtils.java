@@ -16,14 +16,17 @@
 
 package com.android.contacts.detail;
 
+import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.content.res.Resources.NotFoundException;
+import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.provider.BaseColumns;
 import android.provider.ContactsContract;
 import android.provider.ContactsContract.DisplayNameSources;
 import android.provider.ContactsContract.Preferences;
@@ -143,6 +146,33 @@ public class ContactDetailDisplayUtils {
     }
 
     /**
+     * Returns true if there is a current active secure communication session with WhisperPush.
+     * Returns false if there isn't.
+     */
+    public static boolean hasActiveSession(Context context, String number) {
+        ContentResolver resolver = context.getContentResolver();
+        Cursor cursor = resolver.query(Uri.parse("content://org.whispersystems.whisperpush.sessionprovider"),
+                null, null, new String[] { number }, null);
+
+        if (cursor == null) {
+            return false;
+        }
+
+        try {
+            if (cursor.moveToFirst()) {
+                String session = cursor.getString(0);
+                if (!TextUtils.isEmpty(session)
+                        && TextUtils.equals(session, "1")) {
+                    return true;
+                }
+            }
+        } finally {
+            cursor.close();
+        }
+        return false;
+    }
+
+    /**
      * Returns the organization of the contact. If several organizations are given,
      * the first one is used. Returns null if not applicable.
      */
@@ -236,8 +266,7 @@ public class ContactDetailDisplayUtils {
         setDataOrHideIfNone(snippet, statusView);
         if (photoUri != null) {
             ContactPhotoManager.getInstance(context).loadPhoto(
-                    statusPhotoView, Uri.parse(photoUri), -1, false,
-                    ContactPhotoManager.DEFAULT_BLANK);
+                    statusPhotoView, Uri.parse(photoUri), -1, false, null);
             statusPhotoView.setVisibility(View.VISIBLE);
         } else {
             statusPhotoView.setVisibility(View.GONE);
@@ -342,7 +371,7 @@ public class ContactDetailDisplayUtils {
             pushLayerView.setEnabled(false);
         }
         contactPhotoManager.loadPhoto(imageView, Uri.parse(streamItemPhoto.getPhotoUri()), -1,
-                false, ContactPhotoManager.DEFAULT_BLANK);
+                false, null);
     }
 
     @VisibleForTesting

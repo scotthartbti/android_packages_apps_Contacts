@@ -391,7 +391,9 @@ public class RawContactEditorView extends BaseRawContactEditorView {
             long defaultGroupId = getDefaultGroupId();
             if (defaultGroupId != -1) {
                 ValuesDelta entry = RawContactModifier.insertChild(mState, mGroupMembershipKind);
-                entry.setGroupRowId(defaultGroupId);
+                if (entry != null) {
+                    entry.setGroupRowId(defaultGroupId);
+                }
             }
         }
     }
@@ -497,6 +499,7 @@ public class RawContactEditorView extends BaseRawContactEditorView {
                 if (DataKind.PSEUDO_MIME_TYPE_PHONETIC_NAME.equals(view.getKind().mimeType)) {
                     mPhoneticNameAdded = true;
                     updatePhoneticNameVisibility();
+                    mPhoneticName.requestFocus();
                 } else {
                     view.addItem();
                 }
